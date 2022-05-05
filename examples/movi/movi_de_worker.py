@@ -145,6 +145,37 @@ elif FLAGS.camera == "linear_movement":
     scene.camera.look_at((0, 0, 0))
     scene.camera.keyframe_insert("position", frame)
     scene.camera.keyframe_insert("quaternion", frame)
+elif FLAGS.camera == "linear_jitter_movement":
+  camera_start, camera_end = get_linear_camera_motion_start_end(
+      movement_speed=rng.uniform(low=0., high=FLAGS.max_camera_movement)
+  )
+  angles=np.random.normal(scale=20.*np.pi/180.,size=[FLAGS.frame_end-FLAGS.frame_start+2+25,3])
+  smooth_angles = 0
+  filt=np.exp(-np.square((np.arange(25)-12.)/6.))
+  filt=filt/np.sum(filt)
+  for i in range(25):
+      smooth_angles += angles[i:angles.shape[0]-25+i]*filt[i]
+  smooth_angles=smooth_angles/np.sqrt(25.)
+
+  print("===========================================")
+  print("DOING LINEAR JITTER MOVEMENT!!!!", flush=True)
+  # linearly interpolate the camera position between these two points
+  # while keeping it focused on the center of the scene
+  # we start one frame early and end one frame late to ensure that
+  # forward and backward flow are still consistent for the last and first frames
+  import pyquaternion as pyquat
+  for frame,angle in zip(range(FLAGS.frame_start - 1, FLAGS.frame_end + 2),smooth_angles):
+    interp = ((frame - FLAGS.frame_start + 1) /
+              (FLAGS.frame_end - FLAGS.frame_start + 3))
+    camera_position =(interp * np.array(camera_start) +
+                             (1 - interp) * np.array(camera_end))
+
+    scene.camera.position = camera_position
+    scene.camera.look_at((0, 0, 0))
+    scene.camera.quaternion = pyquat.Quaternion(*scene.camera.quaternion) * kb.core.objects._euler_to_quat(angle)
+    scene.camera.keyframe_insert("position", frame)
+    scene.camera.keyframe_insert("quaternion", frame)
+
 
 
 # ---- Object placement ----
